@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import './App.css';
 
-// --- SUPABASE BAĞLANTI İSTEMCİSİ ---
 const SUPABASE_URL = 'https://rbmfidmnomqyzgvlqome.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_nQQMzbntNL2Bu346iW0HhQ_JVkilrE_';
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- ZAMAN HESAPLAMA YARDIMCISI ---
 const timeAgo = (dateString) => {
   if (!dateString) return '';
   const now = new Date();
@@ -23,7 +21,6 @@ const timeAgo = (dateString) => {
   return `${diffInDays} gün önce`;
 };
 
-// --- ÇEVRİMİÇİ KONTROL YARDIMCISI ---
 const isOnline = (lastSeenString) => {
   if (!lastSeenString) return false;
   const now = new Date();
@@ -46,11 +43,16 @@ export default function App() {
 
   const [user, setUser] = useState(null);
   const [currentScreen, setCurrentScreen] = useState('home'); 
-  const [selectedChat, setSelectedChat] = useState(null); // { id, name, avatar, conversationId, online, lastMessage }
+  const [selectedChat, setSelectedChat] = useState(null); 
+  const [viewingProfile, setViewingProfile] = useState(false); 
   const [messageText, setMessageText] = useState('');
   
-  const messagesEndRef = useRef(null);
+  // --- YAZIYOR... STATE'İ ---
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const typingChannelRef = useRef(null);
 
+  const messagesEndRef = useRef(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
@@ -65,7 +67,37 @@ export default function App() {
   const [allUsers, setAllUsers] = useState([]); 
   const [messages, setMessages] = useState([]);
 
-  // --- 1. OTOMATİK OTURUM VE AKTİFLİK ---
+  // --- TAM EKRAN YÖNETİMİ ---
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
+    const tryAutoFullscreen = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    };
+    window.addEventListener('click', tryAutoFullscreen, { once: true });
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
@@ -120,7 +152,6 @@ export default function App() {
     await fetchAppData(userId);
   };
 
-  // --- 2. VERİLERİ VE SOHBET ODALARINI ÇEKME ---
   const fetchAppData = async (currentUserId) => {
     const { data: profilesData } = await supabase
       .from('profiles')
@@ -132,6 +163,7 @@ export default function App() {
         id: u.id,
         username: u.username,
         fullName: u.full_name,
+        birthDate: u.birth_date || 'Belirtilmemiş',
         location: u.location || 'Konum yok',
         gender: u.gender || 'Belirtilmemiş',
         lastSeen: u.last_seen
@@ -144,26 +176,20 @@ export default function App() {
       .eq('receiver_id', currentUserId)
       .eq('status', 'pending');
 
-    if (reqData) {
-      setPendingRequests(reqData);
-    }
+    if (reqData) setPendingRequests(reqData);
 
-    // Kullanıcının dahil olduğu sohbet odalarını (conversations) çekiyoruz
     const { data: convsData } = await supabase
       .from('conversations')
       .select(`
-        id,
-        user1_id,
-        user2_id,
-        user1:user1_id (id, full_name, last_seen),
-        user2:user2_id (id, full_name, last_seen)
+        id, user1_id, user2_id,
+        user1:user1_id (id, full_name, username, birth_date, location, gender, last_seen),
+        user2:user2_id (id, full_name, username, birth_date, location, gender, last_seen)
       `)
       .or(`user1_id.eq.${currentUserId},user2_id.eq.${currentUserId}`);
 
     let activeChats = [];
     if (convsData) {
       convsData.forEach(conv => {
-        // Karşıdaki arkadaşı bulalım
         const isUser1 = conv.user1_id === currentUserId;
         const friend = isUser1 ? conv.user2 : conv.user1;
 
@@ -173,6 +199,10 @@ export default function App() {
             id: friend.id,
             conversationId: conv.id,
             name: friend.full_name,
+            username: friend.username || 'kullanici',
+            birthDate: friend.birth_date || 'Belirtilmemiş',
+            location: friend.location || 'Konum yok',
+            gender: friend.gender || 'Belirtilmemiş',
             avatar: friend.full_name.charAt(0),
             lastMessage: onlineStatus ? 'Çevrimiçi 🟢' : `Son görülme: ${timeAgo(friend.last_seen)}`,
             time: '',
@@ -182,13 +212,10 @@ export default function App() {
         }
       });
     }
-
     setChats(activeChats);
   };
 
-  // --- 3. ODA OLUŞTURMA YARDIMCISI ---
   const getOrCreateConversation = async (userId1, userId2) => {
-    // Önce oda var mı kontrol et
     const { data: existing } = await supabase
       .from('conversations')
       .select('id')
@@ -197,7 +224,6 @@ export default function App() {
 
     if (existing) return existing.id;
 
-    // Yoksa yeni oda aç
     const { data: newConv, error } = await supabase
       .from('conversations')
       .insert([{ user1_id: userId1, user2_id: userId2 }])
@@ -208,7 +234,6 @@ export default function App() {
     return null;
   };
 
-  // --- 4. DAVET İŞLEMLERİ ---
   const handleSendInvite = async (targetUser) => {
     if (!user?.id) return;
     const { error } = await supabase.from('friend_requests').insert([
@@ -219,20 +244,14 @@ export default function App() {
   };
 
   const handleAcceptInvite = async (requestItem) => {
-    // 1. İsteği accepted yap
     const { error } = await supabase
       .from('friend_requests')
       .update({ status: 'accepted' })
       .eq('id', requestItem.id);
 
-    if (error) {
-      showToast('İstek kabul edilemedi.', 'error');
-      return;
-    }
+    if (error) { showToast('İstek kabul edilemedi.', 'error'); return; }
 
-    // 2. Otomatik olarak aralarında sohbet odası (conversation) oluştur
     await getOrCreateConversation(user.id, requestItem.sender_id);
-
     showToast(`${requestItem.profiles.full_name} ile arkadaş oldunuz!`, 'success');
     await fetchAppData(user.id);
     setPendingRequests(pendingRequests.filter(r => r.id !== requestItem.id));
@@ -240,29 +259,19 @@ export default function App() {
 
   const handleRemoveFriend = async (friendId) => {
     if (!user?.id) return;
-
-    // A) İlişkiyi sil
-    await supabase
-      .from('friend_requests')
-      .delete()
-      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
-
-    // B) Sohbet odasını sil
-    await supabase
-      .from('conversations')
-      .delete()
-      .or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},user2_id.eq.${user.id})`);
+    await supabase.from('friend_requests').delete().or(`and(sender_id.eq.${user.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
+    await supabase.from('conversations').delete().or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},receiver_id.eq.${user.id})`);
 
     showToast('Arkadaşlıktan çıkarıldı.', 'info');
+    setViewingProfile(false);
     setSelectedChat(null);
     setCurrentScreen('home');
     await fetchAppData(user.id);
   };
 
-
-  // --- 5. ODA ÜZERİNDEN MESAJLARI ÇEKME VE REALTIME DİNLEME ---
+  // --- REALTIME SOHBET, OKUNDU BİLGİSİ VE YAZIYOR... YÖNETİMİ ---
   useEffect(() => {
-    if (!selectedChat?.conversationId) return;
+    if (!selectedChat?.conversationId || !user?.id) return;
 
     const fetchMessages = async () => {
       const { data, error } = await supabase
@@ -276,67 +285,114 @@ export default function App() {
           id: m.id,
           sender: m.sender_id === user.id ? 'me' : 'them',
           text: m.content,
+          isRead: m.is_read,
           time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         })));
+
+        // Gelen okunmamış mesajları okundu olarak işaretle
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .eq('conversation_id', selectedChat.conversationId)
+          .neq('sender_id', user.id);
       }
     };
 
     fetchMessages();
 
-    // Canlı Realtime Dinleme (Oda bazlı)
-    const channel = supabase
-      .channel(`room-${selectedChat.conversationId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedChat.conversationId}` },
-        (payload) => {
-          const newMessage = payload.new;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: newMessage.id,
-              sender: newMessage.sender_id === user.id ? 'me' : 'them',
-              text: newMessage.content,
-              time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
+    // Broadcast kanal ile Yazıyor... ve Yeni Mesaj Takibi
+    const channel = supabase.channel(`room-${selectedChat.conversationId}`, {
+      config: { broadcast: { self: false } }
+    });
+
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedChat.conversationId}` }, async (payload) => {
+        const newMessage = payload.new;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newMessage.id,
+            sender: newMessage.sender_id === user.id ? 'me' : 'them',
+            text: newMessage.content,
+            isRead: newMessage.is_read,
+            time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+
+        if (newMessage.sender_id !== user.id) {
+          await supabase.from('messages').update({ is_read: true }).eq('id', newMessage.id);
         }
-      )
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedChat.conversationId}` }, (payload) => {
+        const updatedMsg = payload.new;
+        setMessages((prev) => prev.map(m => m.id === updatedMsg.id ? { ...m, isRead: updatedMsg.is_read } : m));
+      })
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload.userId !== user.id) {
+          setIsTyping(payload.payload.isTyping);
+        }
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+    typingChannelRef.current = channel;
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      setIsTyping(false);
     };
   }, [selectedChat, user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
 
-  // --- 6. MESAJ GÖNDERME ---
+  // Yazı yazıldığında karşı tarafa "Yazıyor..." sinyali gönder
+  const handleInputChange = (e) => {
+    setMessageText(e.target.value);
+
+    if (typingChannelRef.current && user) {
+      typingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: user.id, isTyping: true }
+      });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      typingTimeoutRef.current = setTimeout(() => {
+        typingChannelRef.current.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: { userId: user.id, isTyping: false }
+        });
+      }, 2000);
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!messageText.trim() || !selectedChat?.conversationId || !user) return;
+
+    if (typingChannelRef.current) {
+      typingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: user.id, isTyping: false }
+      });
+    }
 
     const textPayload = messageText;
     setMessageText('');
 
     const { error } = await supabase.from('messages').insert([
-      { conversation_id: selectedChat.conversationId, sender_id: user.id, content: textPayload }
+      { conversation_id: selectedChat.conversationId, sender_id: user.id, content: textPayload, is_read: false }
     ]);
 
-    if (error) {
-      showToast('Mesaj gönderilemedi: ' + error.message, 'error');
-    }
+    if (error) showToast('Mesaj gönderilemedi: ' + error.message, 'error');
   };
 
-
-  // --- OTOMATİK KONUM VE AUTH ---
   const handleFetchLocation = () => {
-    if (!navigator.geolocation) {
-      showToast('Konum desteklenmiyor.', 'error');
-      return;
-    }
+    if (!navigator.geolocation) { showToast('Konum desteklenmiyor.', 'error'); return; }
     showToast('Konum alınıyor...', 'info');
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -349,9 +405,7 @@ export default function App() {
           if (user) setUser({ ...user, location: city });
           else setLocationVal(city);
           showToast(`Konum bulundu: ${city}`, 'success');
-        } catch {
-          showToast('Konum adı çözülemedi.', 'error');
-        }
+        } catch { showToast('Konum adı çözülemedi.', 'error'); }
       },
       () => showToast('Konum izni reddedildi.', 'error')
     );
@@ -409,15 +463,26 @@ export default function App() {
     else showToast('Profil güncellendi!', 'success');
   };
 
+  return (
+    <div className="app-container desktop-layout-root">
+      
+      {/* KÖŞEDEKİ TAM EKRAN BUTONU (Yalnızca Ana Ekranda Görünür, Sohbet İçinde Kaybolur) */}
+      {!selectedChat && currentScreen === 'home' && (
+        <button 
+          className="global-fullscreen-fab" 
+          onClick={toggleFullscreen} 
+          title={isFullscreen ? "Normal Ekrana Dön" : "Tam Ekran Yap"}
+        >
+          {isFullscreen ? '🗗' : '⛶'}
+        </button>
+      )}
 
-  // ================= RENDER 1: AUTH =================
-  if (appStage === 'auth') {
-    return (
-      <div className="app-container">
-        <div className={`kevok-toast ${toast.show ? 'show' : ''} toast-${toast.type}`}>
-          <span className="toast-icon">{toast.type === 'success' ? '✨' : '⚠️'}</span>
-          <p>{toast.message}</p>
-        </div>
+      <div className={`kevok-toast ${toast.show ? 'show' : ''} toast-${toast.type}`}>
+        <span className="toast-icon">{toast.type === 'success' ? '✨' : '⚠️'}</span>
+        <p>{toast.message}</p>
+      </div>
+
+      {appStage === 'auth' ? (
         <div className="auth-modal-overlay">
           <div className="auth-modal-card">
             <div className="auth-header-brand">
@@ -473,231 +538,304 @@ export default function App() {
             </form>
           </div>
         </div>
-      </div>
-    );
-  }
+      ) : (
+        <>
+          {/* SOL SÜTUN */}
+          <div className={`sidebar-panel ${selectedChat && window.innerWidth <= 768 ? 'mobile-hidden' : ''}`}>
+            <div className="sidebar-header">
+              <div className="sidebar-brand">
+                <span className="brand-icon-mini">🕊️</span>
+                <h1>Kevok</h1>
+              </div>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <button 
+                  className="icon-btn" 
+                  onClick={() => setCurrentScreen('requests')} 
+                  title="Gelen Arkadaşlık İstekleri"
+                  style={{position: 'relative'}}
+                >
+                  📥
+                  {pendingRequests.length > 0 && (
+                    <span className="notification-badge-red">{pendingRequests.length}</span>
+                  )}
+                </button>
+                <button className="icon-btn" onClick={() => setCurrentScreen('settings')} title="Ayarlar">
+                  ⚙️
+                </button>
+              </div>
+            </div>
 
+            <div className="search-box-container">
+              <input type="text" placeholder="Sohbetlerde ara..." className="sidebar-search-input" />
+            </div>
 
-  // ================= RENDER 2: MAIN APP =================
-  return (
-    <div className="app-container desktop-layout-root">
-      
-      <div className={`kevok-toast ${toast.show ? 'show' : ''} toast-${toast.type}`}>
-        <span className="toast-icon">{toast.type === 'success' ? '✨' : '⚠️'}</span>
-        <p>{toast.message}</p>
-      </div>
-
-      {/* SOL SÜTUN */}
-      <div className={`sidebar-panel ${selectedChat && window.innerWidth <= 768 ? 'mobile-hidden' : ''}`}>
-        
-        <div className="sidebar-header">
-          <div className="sidebar-brand">
-            <span className="brand-icon-mini">🕊️</span>
-            <h1>Kevok</h1>
-          </div>
-          
-          <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-            <button 
-              className="icon-btn" 
-              onClick={() => setCurrentScreen('requests')} 
-              title="Gelen Arkadaşlık İstekleri"
-              style={{position: 'relative'}}
-            >
-              📥
-              {pendingRequests.length > 0 && (
-                <span className="notification-badge-red">{pendingRequests.length}</span>
-              )}
-            </button>
-
-            <button className="icon-btn" onClick={() => setCurrentScreen('settings')} title="Ayarlar">
-              ⚙️
-            </button>
-          </div>
-        </div>
-
-        <div className="search-box-container">
-          <input type="text" placeholder="Sohbetlerde ara..." className="sidebar-search-input" />
-        </div>
-
-        <div className="chat-list-scroll">
-          <div className="section-title-label">Aktif Sohbetler</div>
-          {chats.length === 0 ? (
-            <p style={{color: '#64748b', fontSize: '0.85rem', padding: '10px'}}>Henüz aktif sohbet yok. Arkadaş eklemek için sağ alttaki (+) butonuna basın.</p>
-          ) : (
-            chats.map((chat) => (
-              <div 
-                key={chat.id} 
-                className={`chat-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
-                onClick={() => { setSelectedChat(chat); setCurrentScreen('chat'); }}
-              >
-                <div className="chat-avatar" style={{position: 'relative'}}>
-                  {chat.avatar}
-                  {chat.online && <span className="online-dot-indicator"></span>}
-                </div>
-                <div className="chat-info">
-                  <div className="chat-item-top">
-                    <h3>{chat.name}</h3>
-                    <span className="chat-time">{chat.time}</span>
+            <div className="chat-list-scroll">
+              <div className="section-title-label">Aktif Sohbetler</div>
+              {chats.length === 0 ? (
+                <p style={{color: '#64748b', fontSize: '0.85rem', padding: '10px'}}>Henüz aktif sohbet yok. Arkadaş eklemek için sağ alttaki (+) butonuna basın.</p>
+              ) : (
+                chats.map((chat) => (
+                  <div 
+                    key={chat.id} 
+                    className={`chat-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
+                    onClick={() => { setSelectedChat(chat); setViewingProfile(false); setCurrentScreen('chat'); }}
+                  >
+                    <div className="chat-avatar" style={{position: 'relative'}}>
+                      {chat.avatar}
+                      {chat.online && <span className="online-dot-indicator"></span>}
+                    </div>
+                    <div className="chat-info">
+                      <div className="chat-item-top">
+                        <h3>{chat.name}</h3>
+                        <span className="chat-time">{chat.time}</span>
+                      </div>
+                      <p className="chat-last-msg">{chat.lastMessage}</p>
+                    </div>
                   </div>
-                  <p className="chat-last-msg">{chat.lastMessage}</p>
+                ))
+              )}
+            </div>
+
+            <div className="fab-container" onClick={() => setCurrentScreen('add-friend')} title="Arkadaş Keşfet">
+              <div className="fab-button">+</div>
+            </div>
+          </div>
+
+          {/* SAĞ İÇERİK ALANI */}
+          <div className={`content-panel ${!selectedChat && window.innerWidth <= 768 && currentScreen === 'home' ? 'mobile-hidden' : ''}`}>
+            
+            {currentScreen === 'chat' && selectedChat ? (
+              
+              viewingProfile ? (
+                <div className="sub-screen-container">
+                  <div className="sub-screen-header">
+                    <button className="back-arrow-btn" onClick={() => setViewingProfile(false)}>←</button>
+                    <h2>Kullanıcı Profili</h2>
+                  </div>
+                  <div className="sub-screen-scroll-body">
+                    <div className="profile-view-card">
+                      <div className="profile-view-avatar-wrapper">
+                        <div className="profile-big-avatar">{selectedChat.avatar}</div>
+                        {selectedChat.online && <span className="profile-status-badge">Çevrimiçi</span>}
+                      </div>
+                      
+                      <h2 className="profile-view-name">{selectedChat.name}</h2>
+                      <p className="profile-view-username">@{selectedChat.username}</p>
+
+                      <div className="profile-info-grid">
+                        <div className="profile-info-card-item">
+                          <span className="info-icon">🎂</span>
+                          <div className="info-details">
+                            <span className="info-label">Doğum Tarihi</span>
+                            <span className="info-value">{selectedChat.birthDate}</span>
+                          </div>
+                        </div>
+
+                        <div className="profile-info-card-item">
+                          <span className="info-icon">📍</span>
+                          <div className="info-details">
+                            <span className="info-label">Konum</span>
+                            <span className="info-value">{selectedChat.location}</span>
+                          </div>
+                        </div>
+
+                        <div className="profile-info-card-item">
+                          <span className="info-icon">⚥</span>
+                          <div className="info-details">
+                            <span className="info-label">Cinsiyet</span>
+                            <span className="info-value">{selectedChat.gender}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button 
+                        className="logout-btn" 
+                        onClick={() => {
+                          if (window.confirm(`${selectedChat.name} kişisini arkadaşlıktan çıkarmak istiyor musunuz?`)) {
+                            handleRemoveFriend(selectedChat.id);
+                          }
+                        }} 
+                        style={{marginTop: '30px'}}
+                      >
+                        🗑️ Arkadaşlıktan Çıkar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="chat-room-container">
+                  <div className="chat-room-header">
+                    <button className="back-arrow-btn" onClick={() => { setSelectedChat(null); setCurrentScreen('home'); }}>←</button>
+                    
+                    <div className="chat-room-profile-click" onClick={() => setViewingProfile(true)} title="Profili Görüntüle">
+                      <div className="chat-room-avatar-large">
+                        {selectedChat.avatar}
+                        {selectedChat.online && <span className="online-dot-indicator-large"></span>}
+                      </div>
+                      <div className="chat-room-user-info">
+                        <h2>{selectedChat.name}</h2>
+                        <span>{isTyping ? 'yazıyor...' : (selectedChat.online ? 'Çevrimiçi 🟢' : selectedChat.lastMessage)}</span>
+                      </div>
+                    </div>
+
+                    <div style={{display: 'flex', gap: '8px', marginLeft: 'auto'}}>
+                      <button className="icon-btn" onClick={() => showToast('Sesli arama özelliği yakında aktif olacaktır 🕊️', 'info')} title="Sesli Ara">
+                        📞
+                      </button>
+                      <button className="icon-btn" onClick={() => showToast('Görüntülü arama özelliği yakında aktif olacaktır 🕊️', 'info')} title="Görüntülü Ara">
+                        📹
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="messages-stream">
+                    {messages.length === 0 ? (
+                      <div style={{textAlign: 'center', color: '#64748b', marginTop: '40px', fontSize: '0.9rem'}}>
+                        Henüz mesaj yok. İlk mesajı göndererek sohbeti başlatın! 🕊️
+                      </div>
+                    ) : (
+                       messages.map((msg) => (
+                        <div key={msg.id} className={`message-bubble ${msg.sender === 'me' ? 'msg-me' : 'msg-them'}`}>
+                          <p>{msg.text}</p>
+                          <div className="msg-footer">
+                            <span className="msg-time">{msg.time}</span>
+                            {msg.sender === 'me' && (
+                              <span className={`msg-ticks ${msg.isRead ? 'read' : ''}`}>
+                                {msg.isRead ? '✓✓' : '✓'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+
+
+                    )}
+                    {/* YAZIYOR... ANİMASYON BALONU */}
+                    {isTyping && (
+                      <div className="message-bubble msg-them typing-bubble">
+                        <div className="typing-dots">
+                          <span></span><span></span><span></span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  <form className="message-input-form" onSubmit={handleSendMessage}>
+                    <button type="button" className="media-attach-btn" onClick={() => showToast('Fotoğraf ekleme yakında aktif olacaktır 🕊️', 'info')} title="Fotoğraf Çek / Ekle">
+                      📷
+                    </button>
+                    <button type="button" className="media-attach-btn" onClick={() => showToast('Dosya yükleme yakında aktif olacaktır 🕊️', 'info')} title="Dosya Seç">
+                      📎
+                    </button>
+                    <input type="text" placeholder="Mesaj yazın..." value={messageText} onChange={handleInputChange} />
+                    <button type="submit" className="send-msg-btn">➤</button>
+                  </form>
+                </div>
+              )
+
+            ) : currentScreen === 'requests' ? (
+              
+              <div className="sub-screen-container">
+                <div className="sub-screen-header">
+                  <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
+                  <h2>Gelen İstekler ({pendingRequests.length})</h2>
+                </div>
+                <div className="sub-screen-scroll-body">
+                  {pendingRequests.length === 0 ? (
+                    <p style={{color: '#94a3b8', padding: '20px'}}>Bekleyen arkadaşlık isteğiniz yok.</p>
+                  ) : (
+                    pendingRequests.map((req) => (
+                      <div key={req.id} className="user-discovery-card">
+                        <div className="discovery-avatar">{req.profiles?.full_name?.charAt(0) || 'K'}</div>
+                        <div className="discovery-info">
+                          <h4>{req.profiles?.full_name} <span>@{req.profiles?.username}</span></h4>
+                          <p>📍 {req.profiles?.location || 'Konum yok'} • <span style={{color: '#38bdf8'}}>{timeAgo(req.created_at)}</span></p>
+                        </div>
+                        <button className="invite-action-btn" style={{background: '#4ade80', color: '#030712'}} onClick={() => handleAcceptInvite(req)}>Kabul Et</button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
 
-        <div className="fab-container" onClick={() => setCurrentScreen('add-friend')} title="Arkadaş Keşfet">
-          <div className="fab-button">+</div>
-        </div>
-      </div>
+            ) : currentScreen === 'settings' ? (
+              
+              <div className="sub-screen-container">
+                <div className="sub-screen-header">
+                  <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
+                  <h2>Profil ve Ayarlar</h2>
+                </div>
+                <div className="sub-screen-scroll-body">
+                  <div className="settings-card-content">
+                    <div className="profile-big-avatar">{user?.fullName?.charAt(0) || 'K'}</div>
+                    <h3>{user?.fullName}</h3>
+                    <p className="profile-username">@{user?.username}</p>
 
-
-      {/* SAĞ İÇERİK ALANI */}
-      <div className={`content-panel ${!selectedChat && window.innerWidth <= 768 && currentScreen === 'home' ? 'mobile-hidden' : ''}`}>
-        
-        {currentScreen === 'chat' && selectedChat ? (
-          <div className="chat-room-container">
-            <div className="chat-room-header">
-              <button className="back-arrow-btn" onClick={() => { setSelectedChat(null); setCurrentScreen('home'); }}>←</button>
-              <div className="chat-room-avatar">{selectedChat.avatar}</div>
-              <div className="chat-room-user-info" style={{flex: 1}}>
-                <h2>{selectedChat.name}</h2>
-                <span>{selectedChat.online ? 'Çevrimiçi 🟢' : selectedChat.lastMessage}</span>
+                    <form className="profile-edit-form" onSubmit={handleProfileUpdate}>
+                      <div className="input-group">
+                        <label>Ad Soyad</label>
+                        <input type="text" value={user?.fullName || ''} onChange={(e) => setUser({...user, fullName: e.target.value})} />
+                      </div>
+                      <div className="input-group">
+                        <label>Kullanıcı Adı</label>
+                        <input type="text" value={user?.username || ''} onChange={(e) => setUser({...user, username: e.target.value})} />
+                      </div>
+                      <div className="input-group">
+                        <label>Konum</label>
+                        <div style={{display: 'flex', gap: '8px'}}>
+                          <input type="text" value={user?.location || ''} onChange={(e) => setUser({...user, location: e.target.value})} style={{flex: 1}} />
+                          <button type="button" className="location-btn" onClick={handleFetchLocation}>📍</button>
+                        </div>
+                      </div>
+                      <button type="submit" className="submit-btn" style={{marginTop: '10px'}}>Değişiklikleri Kaydet</button>
+                    </form>
+                    <button className="logout-btn" onClick={handleLogout}>Oturumu Kapat</button>
+                  </div>
+                </div>
               </div>
-              <button 
-                className="icon-btn" 
-                onClick={() => {
-                  if (window.confirm(`${selectedChat.name} kişisini arkadaşlıktan çıkarmak istiyor musunuz?`)) {
-                    handleRemoveFriend(selectedChat.id);
-                  }
-                }} 
-                title="Arkadaşlıktan Çıkar"
-                style={{backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)'}}
-              >
-                🗑️
-              </button>
-            </div>
 
-            <div className="messages-stream">
-              {messages.length === 0 ? (
-                <div style={{textAlign: 'center', color: '#64748b', marginTop: '40px', fontSize: '0.9rem'}}>
-                  Henüz mesaj yok. İlk mesajı göndererek sohbeti başlatın! 🕊️
+            ) : currentScreen === 'add-friend' ? (
+              
+              <div className="sub-screen-container">
+                <div className="sub-screen-header">
+                  <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
+                  <h2>Yeni Arkadaşlar Keşfet</h2>
                 </div>
-              ) : (
-                messages.map((msg) => (
-                  <div key={msg.id} className={`message-bubble ${msg.sender === 'me' ? 'msg-me' : 'msg-them'}`}>
-                    <p>{msg.text}</p>
-                    <span className="msg-time">{msg.time}</span>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <form className="message-input-form" onSubmit={handleSendMessage}>
-              <input type="text" placeholder="Mesaj yazın..." value={messageText} onChange={(e) => setMessageText(e.target.value)} />
-              <button type="submit" className="send-msg-btn">➤</button>
-            </form>
-          </div>
-
-        ) : currentScreen === 'requests' ? (
-          
-          <div className="sub-screen-container">
-            <div className="sub-screen-header">
-              <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
-              <h2>Gelen Arkadaşlık İstekleri ({pendingRequests.length})</h2>
-            </div>
-            <div className="add-friend-list">
-              {pendingRequests.length === 0 ? (
-                <p style={{color: 'var(--kevok-silver)', marginTop: '20px'}}>Bekleyen arkadaşlık isteğiniz yok.</p>
-              ) : (
-                pendingRequests.map((req) => (
-                  <div key={req.id} className="user-discovery-card">
-                    <div className="discovery-avatar">{req.profiles?.full_name?.charAt(0) || 'K'}</div>
-                    <div className="discovery-info">
-                      <h4>{req.profiles?.full_name} <span>@{req.profiles?.username}</span></h4>
-                      <p>📍 {req.profiles?.location || 'Konum yok'} • <span style={{color: '#38bdf8'}}>{timeAgo(req.created_at)}</span></p>
-                    </div>
-                    <button className="invite-action-btn" style={{background: '#4ade80', color: '#030712'}} onClick={() => handleAcceptInvite(req)}>Kabul Et</button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        ) : currentScreen === 'settings' ? (
-          
-          <div className="sub-screen-container">
-            <div className="sub-screen-header">
-              <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
-              <h2>Profil ve Hesap Ayarları</h2>
-            </div>
-            <div className="settings-card-content">
-              <div className="profile-big-avatar">{user?.fullName?.charAt(0) || 'K'}</div>
-              <h3>{user?.fullName}</h3>
-              <p className="profile-username">@{user?.username}</p>
-
-              <form className="profile-edit-form" onSubmit={handleProfileUpdate}>
-                <div className="input-group">
-                  <label>Ad Soyad</label>
-                  <input type="text" value={user?.fullName || ''} onChange={(e) => setUser({...user, fullName: e.target.value})} />
+                <div className="sub-screen-scroll-body">
+                  <p className="section-desc">Kevok ağındaki diğer kullanıcılar:</p>
+                  {allUsers.length === 0 ? (
+                    <p style={{color: '#94a3b8', padding: '20px'}}>Başka kullanıcı bulunamadı.</p>
+                  ) : (
+                    allUsers.map((u) => (
+                      <div key={u.id} className="user-discovery-card">
+                        <div className="discovery-avatar">
+                          {u.fullName.charAt(0)}
+                          {isOnline(u.lastSeen) && <span className="online-dot-indicator"></span>}
+                        </div>
+                        <div className="discovery-info">
+                          <h4>{u.fullName} <span>@{u.username}</span></h4>
+                          <p>📍 {u.location} {isOnline(u.lastSeen) ? '• 🟢 Çevrimiçi' : `• ${timeAgo(u.lastSeen)}`}</p>
+                        </div>
+                        <button className="invite-action-btn" onClick={() => handleSendInvite(u)}>Davet Et</button>
+                      </div>
+                    ))
+                  )}
                 </div>
-                <div className="input-group">
-                  <label>Kullanıcı Adı</label>
-                  <input type="text" value={user?.username || ''} onChange={(e) => setUser({...user, username: e.target.value})} />
-                </div>
-                <div className="input-group">
-                  <label>Konum</label>
-                  <div style={{display: 'flex', gap: '8px'}}>
-                    <input type="text" value={user?.location || ''} onChange={(e) => setUser({...user, location: e.target.value})} style={{flex: 1}} />
-                    <button type="button" className="location-btn" onClick={handleFetchLocation}>📍</button>
-                  </div>
-                </div>
-                <button type="submit" className="submit-btn" style={{marginTop: '10px'}}>Değişiklikleri Kaydet</button>
-              </form>
-              <button className="logout-btn" onClick={handleLogout}>Oturumu Kapat</button>
-            </div>
-          </div>
+              </div>
 
-        ) : currentScreen === 'add-friend' ? (
-          
-          <div className="sub-screen-container">
-            <div className="sub-screen-header">
-              <button className="back-arrow-btn" onClick={() => setCurrentScreen('home')}>←</button>
-              <h2>Yeni Arkadaşlar Keşfet</h2>
-            </div>
-            <div className="add-friend-list">
-              <p className="section-desc">Kevok ağındaki diğer kullanıcılar:</p>
-              {allUsers.length === 0 ? (
-                <p style={{color: 'var(--kevok-silver)', marginTop: '20px'}}>Başka kullanıcı bulunamadı.</p>
-              ) : (
-                allUsers.map((u) => (
-                  <div key={u.id} className="user-discovery-card">
-                    <div className="discovery-avatar">
-                      {u.fullName.charAt(0)}
-                      {isOnline(u.lastSeen) && <span className="online-dot-indicator"></span>}
-                    </div>
-                    <div className="discovery-info">
-                      <h4>{u.fullName} <span>@{u.username}</span></h4>
-                      <p>📍 {u.location} {isOnline(u.lastSeen) ? '• 🟢 Çevrimiçi' : `• ${timeAgo(u.lastSeen)}`}</p>
-                    </div>
-                    <button className="invite-action-btn" onClick={() => handleSendInvite(u)}>Davet Et</button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+            ) : (
+              
+              <div className="empty-welcome-state">
+                <div className="welcome-dove-logo">🕊️</div>
+                <h2>Kevok İletişim Merkezine Hoş Geldiniz</h2>
+                <p>Sol üstteki gelen kutusundan istekleri kabul edin veya sol alttaki (+) butonundan arkadaş keşfedin.</p>
+              </div>
+            )}
 
-        ) : (
-          
-          <div className="empty-welcome-state">
-            <div className="welcome-dove-logo">🕊️</div>
-            <h2>Kevok İletişim Merkezine Hoş Geldiniz</h2>
-            <p>Sol üstteki gelen kutusundan istekleri kabul edin veya sol alttaki (+) butonundan arkadaş keşfedin.</p>
           </div>
-        )}
-
-      </div>
+        </>
+      )}
     </div>
   );
 }
