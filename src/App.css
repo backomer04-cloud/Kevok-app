@@ -17,13 +17,13 @@
   padding: 0;
 }
 
-/* Kayma = 0 ve Kusursuz Sabitleme */
 html, body, #root {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: 0;
-  overflow: hidden !important;
+  overflow: hidden;
   background-color: var(--kevok-bg);
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--kevok-text);
@@ -31,15 +31,16 @@ html, body, #root {
 }
 
 .app-container.desktop-layout-root {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   overflow: hidden;
   position: relative;
   background-color: var(--kevok-bg);
 }
 
-/* 🕊️ SOL ALT KÖŞEDEKİ ŞIK TAM EKRAN BUTONU */
+/* Tam ekran butonu */
 .global-fullscreen-fab {
   position: fixed;
   bottom: 20px;
@@ -65,7 +66,7 @@ html, body, #root {
   border-color: var(--kevok-accent);
 }
 
-/* KEVOK TOAST BİLDİRİMLERİ */
+/* Toast Bildirimleri */
 .kevok-toast {
   position: fixed;
   bottom: 24px;
@@ -95,25 +96,30 @@ html, body, #root {
 .toast-error { border-left: 4px solid #ef4444; }
 .toast-info { border-left: 4px solid #38bdf8; }
 
-/* AUTH EKRANI */
+/* Auth Ekranı (Mobilde kaydırma destekli) */
 .auth-modal-overlay {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at center, #0b1329 0%, #030712 100%);
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 20px;
 }
 
 .auth-modal-card {
   width: 100%;
   max-width: 420px;
+  max-height: 90vh;
   background: var(--kevok-sidebar);
   border: 1px solid var(--kevok-border);
   border-radius: 20px;
   padding: 32px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+  overflow-y: auto;
+  margin: auto;
 }
 
 .auth-header-brand {
@@ -193,7 +199,7 @@ html, body, #root {
   border-radius: 10px;
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.2s;
+  width: 100%;
 }
 
 .input-group input:focus, .input-group select:focus {
@@ -220,22 +226,19 @@ html, body, #root {
   font-size: 1rem;
   cursor: pointer;
   margin-top: 8px;
-  transition: opacity 0.2s;
+  width: 100%;
 }
 
-.submit-btn:hover {
-  opacity: 0.9;
-}
-
-/* SOL SÜTUN */
+/* Sol Sütun */
 .sidebar-panel {
   width: 340px;
-  height: 100vh;
+  height: 100%;
   background: var(--kevok-sidebar);
   border-right: 1px solid var(--kevok-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .sidebar-header {
@@ -259,7 +262,6 @@ html, body, #root {
 .sidebar-brand h1 {
   font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
   color: #f8fafc;
 }
 
@@ -274,12 +276,6 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
-}
-
-.icon-btn:hover {
-  background: #1e293b;
-  border-color: var(--kevok-accent);
 }
 
 .notification-badge-red {
@@ -331,7 +327,6 @@ html, body, #root {
   padding: 12px;
   border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s;
   margin-bottom: 4px;
 }
 
@@ -353,6 +348,7 @@ html, body, #root {
   color: var(--kevok-accent);
   flex-shrink: 0;
   border: 1px solid var(--kevok-border);
+  position: relative;
 }
 
 .online-dot-indicator {
@@ -403,7 +399,7 @@ html, body, #root {
 .fab-container {
   position: absolute;
   bottom: 24px;
-  left: 284px;
+  left: 276px;
   z-index: 10;
 }
 
@@ -420,41 +416,37 @@ html, body, #root {
   font-weight: bold;
   box-shadow: 0 8px 20px rgba(56, 189, 248, 0.4);
   cursor: pointer;
-  transition: transform 0.2s;
 }
 
-.fab-button:hover {
-  transform: scale(1.08);
-}
-
-/* SAĞ İÇERİK VE MAT ALT SAYFALAR */
+/* Sağ İçerik Paneli */
 .content-panel {
   flex: 1;
-  height: 100vh;
-  background-color: var(--kevok-sidebar) !important;
+  height: 100%;
+  background-color: var(--kevok-sidebar);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  min-width: 0;
 }
 
-.sub-screen-container {
+.sub-screen-container, .chat-room-container {
   width: 100%;
-  height: 100vh;
-  background-color: var(--kevok-sidebar) !important;
+  height: 100%;
+  background-color: var(--kevok-sidebar);
   display: flex;
   flex-direction: column;
-  z-index: 10;
   overflow: hidden;
 }
 
-.sub-screen-header {
-  padding: 20px;
+.sub-screen-header, .chat-room-header {
+  padding: 16px 20px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   border-bottom: 1px solid var(--kevok-border);
   background-color: var(--kevok-sidebar);
+  flex-shrink: 0;
 }
 
 .sub-screen-header h2 {
@@ -482,29 +474,7 @@ html, body, #root {
   justify-content: center;
   cursor: pointer;
   font-size: 1.1rem;
-  transition: background 0.2s;
-}
-
-.back-arrow-btn:hover {
-  background: #1e293b;
-}
-
-/* SOHBET ODASI VE PROFİL ALANLARI */
-.chat-room-container {
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--kevok-sidebar);
-}
-
-.chat-room-header {
-  padding: 14px 20px;
-  background: var(--kevok-sidebar);
-  border-bottom: 1px solid var(--kevok-border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-shrink: 0;
 }
 
 .chat-room-profile-click {
@@ -513,25 +483,21 @@ html, body, #root {
   gap: 12px;
   cursor: pointer;
   flex: 1;
+  min-width: 0;
   padding: 4px 8px;
   border-radius: 10px;
-  transition: background 0.2s;
-}
-
-.chat-room-profile-click:hover {
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .chat-room-avatar-large {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: var(--kevok-accent);
   border: 1.5px solid var(--kevok-border);
   position: relative;
@@ -542,17 +508,25 @@ html, body, #root {
   position: absolute;
   bottom: 1px;
   right: 1px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: #4ade80;
   border: 2px solid var(--kevok-sidebar);
   border-radius: 50%;
+}
+
+.chat-room-user-info {
+  min-width: 0;
+  flex: 1;
 }
 
 .chat-room-user-info h2 {
   font-size: 0.95rem;
   font-weight: 600;
   color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-room-user-info span {
@@ -560,7 +534,7 @@ html, body, #root {
   color: #4ade80;
 }
 
-/* 🕊️ YENİNESİL ŞIK PROFİL DETAY KARTI */
+/* Profil Detay Kartı */
 .profile-view-card {
   max-width: 440px;
   margin: 0 auto;
@@ -591,7 +565,6 @@ html, body, #root {
   font-weight: 700;
   color: var(--kevok-accent);
   border: 2px solid var(--kevok-accent);
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
 }
 
 .profile-status-badge {
@@ -621,7 +594,6 @@ html, body, #root {
   margin-bottom: 24px;
 }
 
-/* Şık Grid Bilgi Kartları */
 .profile-info-grid {
   display: flex;
   flex-direction: column;
@@ -637,11 +609,6 @@ html, body, #root {
   border: 1px solid var(--kevok-border);
   padding: 14px 18px;
   border-radius: 14px;
-  transition: border-color 0.2s;
-}
-
-.profile-info-card-item:hover {
-  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .info-icon {
@@ -653,6 +620,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .info-details {
@@ -665,7 +633,6 @@ html, body, #root {
   font-size: 0.75rem;
   color: var(--kevok-silver);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
   font-weight: 600;
 }
 
@@ -675,6 +642,7 @@ html, body, #root {
   font-weight: 500;
 }
 
+/* Mesajlar */
 .messages-stream {
   flex: 1;
   overflow-y: auto;
@@ -686,12 +654,11 @@ html, body, #root {
 }
 
 .message-bubble {
-  max-width: 65%;
+  max-width: 75%;
   padding: 10px 14px 8px 14px;
   border-radius: 12px;
   font-size: 0.92rem;
   line-height: 1.4;
-  position: relative;
   word-break: break-word;
   display: flex;
   flex-direction: column;
@@ -706,7 +673,6 @@ html, body, #root {
   color: #fff;
   align-self: flex-end;
   border-bottom-right-radius: 3px;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
 }
 
 .msg-them {
@@ -717,36 +683,89 @@ html, body, #root {
   border-bottom-left-radius: 3px;
 }
 
+.msg-footer-inline {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  margin-top: 4px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 2px;
+  width: 100%;
+}
 
+.msg-time {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: auto !important;
+}
 
+.msg-ticks-inline {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+  letter-spacing: -1px;
+  flex-shrink: 0;
+}
+
+.msg-ticks-inline.read {
+  color: #4ade80 !important;
+}
+
+.typing-bubble {
+  padding: 12px 16px !important;
+  width: fit-content;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 14px;
+}
+
+.typing-dots span {
+  width: 7px;
+  height: 7px;
+  background: var(--kevok-silver);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
+}
+
+/* Mesaj Giriş Formu (Sabit ve sarsılmaz) */
 .message-input-form {
-  padding: 16px 20px;
+  padding: 12px 16px;
   background: var(--kevok-sidebar);
   border-top: 1px solid var(--kevok-border);
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  flex-shrink: 0 !important;
+  width: 100%;
 }
 
 .media-attach-btn {
   background: var(--kevok-card);
   border: 1px solid var(--kevok-border);
   color: #fff;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1rem;
   cursor: pointer;
-  transition: background 0.2s;
   flex-shrink: 0;
-}
-
-.media-attach-btn:hover {
-  background: #1e293b;
-  border-color: var(--kevok-accent);
 }
 
 .message-input-form input {
@@ -754,38 +773,30 @@ html, body, #root {
   background: var(--kevok-card);
   border: 1px solid var(--kevok-border);
   color: #fff;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: 12px;
   font-size: 0.95rem;
   outline: none;
-}
-
-.message-input-form input:focus {
-  border-color: var(--kevok-accent);
+  min-width: 0;
 }
 
 .send-msg-btn {
   background: var(--kevok-accent);
   border: none;
   color: #030712;
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: transform 0.2s;
   flex-shrink: 0;
 }
 
-.send-msg-btn:hover {
-  transform: scale(1.05);
-}
-
-/* KEŞİF VE İSTEK KARTLARI */
+/* Keşif Kartları */
 .user-discovery-card {
   display: flex;
   align-items: center;
@@ -807,12 +818,13 @@ html, body, #root {
   justify-content: center;
   font-weight: 700;
   color: var(--kevok-accent);
-  position: relative;
+  flex-shrink: 0;
   border: 1px solid var(--kevok-border);
 }
 
 .discovery-info {
   flex: 1;
+  min-width: 0;
 }
 
 .discovery-info h4 {
@@ -820,6 +832,9 @@ html, body, #root {
   font-weight: 600;
   margin-bottom: 4px;
   color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .discovery-info h4 span {
@@ -831,6 +846,9 @@ html, body, #root {
 .discovery-info p {
   font-size: 0.8rem;
   color: var(--kevok-silver);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .invite-action-btn {
@@ -842,14 +860,10 @@ html, body, #root {
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 
-.invite-action-btn:hover {
-  opacity: 0.9;
-}
-
-/* AYARLAR KARTI */
+/* Ayarlar */
 .settings-card-content {
   max-width: 500px;
   margin: 0 auto;
@@ -900,11 +914,6 @@ html, body, #root {
   font-weight: 600;
   margin-top: 20px;
   cursor: pointer;
-  transition: background 0.2s;
-}
-
-.logout-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
 }
 
 .empty-welcome-state {
@@ -937,85 +946,33 @@ html, body, #root {
   max-width: 350px;
 }
 
-/* MOBİL UYUMLULUK */
+/* --- KESİN MOBİL UYUMLULUK KURALLARI (Responsive) --- */
 @media (max-width: 768px) {
-  .mobile-hidden {
+  .mobile-hidden-sidebar {
     display: none !important;
   }
+  
+  .mobile-hidden-content {
+    display: none !important;
+  }
+
   .sidebar-panel {
-    width: 100vw;
+    width: 100% !important;
+    height: 100% !important;
   }
+
   .content-panel {
-    width: 100vw;
+    width: 100% !important;
+    height: 100% !important;
   }
+
   .fab-container {
-    left: auto;
-    right: 24px;
+    left: auto !important;
+    right: 20px !important;
+    bottom: 20px !important;
   }
-}
 
-
-
-/* Mesaj Altı Footer - Saat ve Tikler Kusursuz Hizalama */
-.msg-footer-inline {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 6px !important; /* Saat ile tikler arasında net ve şık bir boşluk */
-  margin-top: 4px !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 2px;
-  width: 100%;
-}
-
-.msg-time {
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-left: auto !important; /* Tik yoksa saati otomatik olarak en sağa dayar */
-}
-
-.msg-ticks-inline {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 700;
-  letter-spacing: -1px;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.msg-ticks-inline.read {
-  color: #4ade80 !important; /* WhatsApp yeşili */
-}
-
-
-
-
-/* Yazıyor... Balonu ve Animasyonu */
-.typing-bubble {
-  padding: 12px 16px !important;
-  width: fit-content;
-}
-
-.typing-dots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  height: 14px;
-}
-
-.typing-dots span {
-  width: 7px;
-  height: 7px;
-  background: var(--kevok-silver);
-  border-radius: 50%;
-  animation: typingBounce 1.4s infinite ease-in-out both;
-}
-
-.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes typingBounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1.0); }
+  .message-bubble {
+    max-width: 85% !important;
+  }
 }

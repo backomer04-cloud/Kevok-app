@@ -47,7 +47,7 @@ export default function App() {
   const [viewingProfile, setViewingProfile] = useState(false); 
   const [messageText, setMessageText] = useState('');
   
-  // --- YAZIYOR... STATE'İ ---
+  // Yazıyor... state'i
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const typingChannelRef = useRef(null);
@@ -67,7 +67,7 @@ export default function App() {
   const [allUsers, setAllUsers] = useState([]); 
   const [messages, setMessages] = useState([]);
 
-  // --- TAM EKRAN YÖNETİMİ ---
+  // Tam ekran yönetimi
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -260,7 +260,7 @@ export default function App() {
   const handleRemoveFriend = async (friendId) => {
     if (!user?.id) return;
     await supabase.from('friend_requests').delete().or(`and(sender_id.eq.${user.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
-    await supabase.from('conversations').delete().or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},receiver_id.eq.${user.id})`);
+    await supabase.from('conversations').delete().or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
 
     showToast('Arkadaşlıktan çıkarıldı.', 'info');
     setViewingProfile(false);
@@ -269,7 +269,6 @@ export default function App() {
     await fetchAppData(user.id);
   };
 
-  // --- REALTIME SOHBET, OKUNDU BİLGİSİ VE YAZIYOR... YÖNETİMİ ---
   useEffect(() => {
     if (!selectedChat?.conversationId || !user?.id) return;
 
@@ -289,7 +288,6 @@ export default function App() {
           time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         })));
 
-        // Gelen okunmamış mesajları okundu olarak işaretle
         await supabase
           .from('messages')
           .update({ is_read: true })
@@ -300,7 +298,6 @@ export default function App() {
 
     fetchMessages();
 
-    // Broadcast kanal ile Yazıyor... ve Yeni Mesaj Takibi
     const channel = supabase.channel(`room-${selectedChat.conversationId}`, {
       config: { broadcast: { self: false } }
     });
@@ -346,7 +343,6 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // Yazı yazıldığında karşı tarafa "Yazıyor..." sinyali gönder
   const handleInputChange = (e) => {
     setMessageText(e.target.value);
 
@@ -466,7 +462,7 @@ export default function App() {
   return (
     <div className="app-container desktop-layout-root">
       
-      {/* KÖŞEDEKİ TAM EKRAN BUTONU (Yalnızca Ana Ekranda Görünür, Sohbet İçinde Kaybolur) */}
+      {/* Tam ekran tuşu (Yalnızca ana ekranda görünür) */}
       {!selectedChat && currentScreen === 'home' && (
         <button 
           className="global-fullscreen-fab" 
@@ -540,8 +536,8 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* SOL SÜTUN */}
-          <div className={`sidebar-panel ${selectedChat && window.innerWidth <= 768 ? 'mobile-hidden' : ''}`}>
+          {/* SOL SÜTUN - Mobilde sohbet veya alt ekran açıldığında otomatik gizlenir */}
+          <div className={`sidebar-panel ${(selectedChat || currentScreen !== 'home') ? 'mobile-hidden-sidebar' : ''}`}>
             <div className="sidebar-header">
               <div className="sidebar-brand">
                 <span className="brand-icon-mini">🕊️</span>
@@ -601,8 +597,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* SAĞ İÇERİK ALANI */}
-          <div className={`content-panel ${!selectedChat && window.innerWidth <= 768 && currentScreen === 'home' ? 'mobile-hidden' : ''}`}>
+          {/* SAĞ İÇERİK ALANI - Mobilde ana ekrandayken gizlenir, sohbette/ayarlarda tam ekran açılır */}
+          <div className={`content-panel ${(!selectedChat && currentScreen === 'home') ? 'mobile-hidden-content' : ''}`}>
             
             {currentScreen === 'chat' && selectedChat ? (
               
@@ -694,23 +690,20 @@ export default function App() {
                         Henüz mesaj yok. İlk mesajı göndererek sohbeti başlatın! 🕊️
                       </div>
                     ) : (
-                       messages.map((msg) => (
+                      messages.map((msg) => (
                         <div key={msg.id} className={`message-bubble ${msg.sender === 'me' ? 'msg-me' : 'msg-them'}`}>
                           <p>{msg.text}</p>
-                          <div className="msg-footer">
+                          <div className="msg-footer-inline">
                             <span className="msg-time">{msg.time}</span>
                             {msg.sender === 'me' && (
-                              <span className={`msg-ticks ${msg.isRead ? 'read' : ''}`}>
+                              <span className={`msg-ticks-inline ${msg.isRead ? 'read' : ''}`}>
                                 {msg.isRead ? '✓✓' : '✓'}
                               </span>
                             )}
                           </div>
                         </div>
                       ))
-
-
                     )}
-                    {/* YAZIYOR... ANİMASYON BALONU */}
                     {isTyping && (
                       <div className="message-bubble msg-them typing-bubble">
                         <div className="typing-dots">
