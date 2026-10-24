@@ -96,7 +96,7 @@ html, body, #root {
 .toast-error { border-left: 4px solid #ef4444; }
 .toast-info { border-left: 4px solid #38bdf8; }
 
-/* Auth Ekranı (Mobilde kaydırma destekli) */
+/* Auth Ekranı */
 .auth-modal-overlay {
   width: 100%;
   height: 100vh;
@@ -421,7 +421,8 @@ html, body, #root {
 /* Sağ İçerik Paneli */
 .content-panel {
   flex: 1;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--kevok-sidebar);
   display: flex;
   flex-direction: column;
@@ -430,9 +431,20 @@ html, body, #root {
   min-width: 0;
 }
 
-.sub-screen-container, .chat-room-container {
+.sub-screen-container {
   width: 100%;
   height: 100%;
+  background-color: var(--kevok-sidebar);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Sohbet Odası - Sanal Klavye Uyumlu Esnek Yapı (100dvh) */
+.chat-room-container {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--kevok-sidebar);
   display: flex;
   flex-direction: column;
@@ -642,7 +654,7 @@ html, body, #root {
   font-weight: 500;
 }
 
-/* Mesajlar */
+/* Mesajlar Akışı */
 .messages-stream {
   flex: 1;
   overflow-y: auto;
@@ -651,6 +663,7 @@ html, body, #root {
   flex-direction: column;
   gap: 10px;
   background: #030712;
+  min-height: 0; /* Flexbox küçülebilirlik garantisi */
 }
 
 .message-bubble {
@@ -741,7 +754,7 @@ html, body, #root {
   40% { transform: scale(1.0); }
 }
 
-/* Mesaj Giriş Formu (Sabit ve sarsılmaz) */
+/* Mesaj Giriş Formu (Klavyenin Üzerine Oturan Yapı) */
 .message-input-form {
   padding: 12px 16px;
   background: var(--kevok-sidebar);
@@ -751,6 +764,9 @@ html, body, #root {
   align-items: center;
   flex-shrink: 0 !important;
   width: 100%;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
 }
 
 .media-attach-btn {
@@ -861,6 +877,15 @@ html, body, #root {
   font-size: 0.85rem;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* Zaten Arkadaş Olanlar İçin Siyah Buton */
+.invite-action-btn.added-black-btn {
+  background: #111827 !important;
+  color: var(--kevok-silver) !important;
+  border: 1px solid var(--kevok-border) !important;
+  cursor: default !important;
+  opacity: 0.8;
 }
 
 /* Ayarlar */

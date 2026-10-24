@@ -47,7 +47,6 @@ export default function App() {
   const [viewingProfile, setViewingProfile] = useState(false); 
   const [messageText, setMessageText] = useState('');
   
-  // Yazıyor... state'i
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const typingChannelRef = useRef(null);
@@ -67,7 +66,6 @@ export default function App() {
   const [allUsers, setAllUsers] = useState([]); 
   const [messages, setMessages] = useState([]);
 
-  // Tam ekran yönetimi
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -172,11 +170,17 @@ export default function App() {
 
     const { data: reqData } = await supabase
       .from('friend_requests')
-      .select(`id, sender_id, created_at, profiles:sender_id (id, username, full_name, location, last_seen)`)
+      .select(`id, sender_id, receiver_id, status, created_at, profiles:sender_id (id, username, full_name, location, last_seen)`)
       .eq('receiver_id', currentUserId)
       .eq('status', 'pending');
 
     if (reqData) setPendingRequests(reqData);
+
+    // Gönderdiğimiz bekleyen istekleri de takip edebilmek için
+    const { data: sentReqData } = await supabase
+      .from('friend_requests')
+      .select(`id, sender_id, receiver_id, status`)
+      .eq('sender_id', currentUserId);
 
     const { data: convsData } = await supabase
       .from('conversations')
@@ -240,7 +244,10 @@ export default function App() {
       { sender_id: user.id, receiver_id: targetUser.id, status: 'pending' }
     ]);
     if (error) showToast('Bu kullanıcıya zaten davet gönderilmiş.', 'error');
-    else showToast(`${targetUser.fullName} kişisine davetiye gönderildi!`, 'success');
+    else {
+      showToast(`${targetUser.fullName} kişisine davetiye gönderildi!`, 'success');
+      await fetchAppData(user.id);
+    }
   };
 
   const handleAcceptInvite = async (requestItem) => {
@@ -260,7 +267,7 @@ export default function App() {
   const handleRemoveFriend = async (friendId) => {
     if (!user?.id) return;
     await supabase.from('friend_requests').delete().or(`and(sender_id.eq.${user.id},receiver_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
-    await supabase.from('conversations').delete().or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(sender_id.eq.${friendId},receiver_id.eq.${user.id})`);
+    await supabase.from('conversations').delete().or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},receiver_id.eq.${user.id})`);
 
     showToast('Arkadaşlıktan çıkarıldı.', 'info');
     setViewingProfile(false);
@@ -462,7 +469,6 @@ export default function App() {
   return (
     <div className="app-container desktop-layout-root">
       
-      {/* Tam ekran tuşu (Yalnızca ana ekranda görünür) */}
       {!selectedChat && currentScreen === 'home' && (
         <button 
           className="global-fullscreen-fab" 
@@ -536,7 +542,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* SOL SÜTUN - Mobilde sohbet veya alt ekran açıldığında otomatik gizlenir */}
           <div className={`sidebar-panel ${(selectedChat || currentScreen !== 'home') ? 'mobile-hidden-sidebar' : ''}`}>
             <div className="sidebar-header">
               <div className="sidebar-brand">
@@ -597,7 +602,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* SAĞ İÇERİK ALANI - Mobilde ana ekrandayken gizlenir, sohbette/ayarlarda tam ekran açılır */}
           <div className={`content-panel ${(!selectedChat && currentScreen === 'home') ? 'mobile-hidden-content' : ''}`}>
             
             {currentScreen === 'chat' && selectedChat ? (
@@ -796,23 +800,30 @@ export default function App() {
                   <h2>Yeni Arkadaşlar Keşfet</h2>
                 </div>
                 <div className="sub-screen-scroll-body">
-                  <p className="section-desc">Kevok ağındaki diğer kullanıcılar:</p>
+                  <p className="section-desc" style={{color: 'var(--kevok-silver)', marginBottom: '16px', fontSize: '0.85rem'}}>Kevok ağındaki diğer kullanıcılar:</p>
                   {allUsers.length === 0 ? (
                     <p style={{color: '#94a3b8', padding: '20px'}}>Başka kullanıcı bulunamadı.</p>
                   ) : (
-                    allUsers.map((u) => (
-                      <div key={u.id} className="user-discovery-card">
-                        <div className="discovery-avatar">
-                          {u.fullName.charAt(0)}
-                          {isOnline(u.lastSeen) && <span className="online-dot-indicator"></span>}
+                    allUsers.map((u) => {
+                      const isAlreadyFriend = chats.some(c => c.id === u.id);
+                      return (
+                        <div key={u.id} className="user-discovery-card">
+                          <div className="discovery-avatar">
+                            {u.fullName.charAt(0)}
+                            {isOnline(u.lastSeen) && <span className="online-dot-indicator"></span>}
+                          </div>
+                          <div className="discovery-info">
+                            <h4>{u.fullName} <span>@{u.username}</span></h4>
+                            <p>📍 {u.location} {isOnline(u.lastSeen) ? '• 🟢 Çevrimiçi' : `• ${timeAgo(u.lastSeen)}`}</p>
+                          </div>
+                          {isAlreadyFriend ? (
+                            <button className="invite-action-btn added-black-btn" disabled>Arkadaşsınız</button>
+                          ) : (
+                            <button className="invite-action-btn" onClick={() => handleSendInvite(u)}>Davet Et</button>
+                          )}
                         </div>
-                        <div className="discovery-info">
-                          <h4>{u.fullName} <span>@{u.username}</span></h4>
-                          <p>📍 {u.location} {isOnline(u.lastSeen) ? '• 🟢 Çevrimiçi' : `• ${timeAgo(u.lastSeen)}`}</p>
-                        </div>
-                        <button className="invite-action-btn" onClick={() => handleSendInvite(u)}>Davet Et</button>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
