@@ -725,7 +725,17 @@ export default function App() {
                     <button type="button" className="media-attach-btn" onClick={() => showToast('Dosya yükleme yakında aktif olacaktır 🕊️', 'info')} title="Dosya Seç">
                       📎
                     </button>
-                    <input type="text" placeholder="Mesaj yazın..." value={messageText} onChange={handleInputChange} />
+                   <input 
+                      type="text" 
+                      placeholder="Mesaj yazın..." 
+                      value={messageText} 
+                      onChange={handleInputChange} 
+                      autoComplete="off" 
+                      autoCorrect="off" 
+                      autoCapitalize="off" 
+                      spellCheck="false" 
+                        />
+
                     <button type="submit" className="send-msg-btn">➤</button>
                   </form>
                 </div>
