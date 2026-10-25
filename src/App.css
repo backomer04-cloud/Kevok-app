@@ -19,7 +19,7 @@
 
 html, body, #root {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   height: 100dvh;
   margin: 0;
   padding: 0;
@@ -32,7 +32,7 @@ html, body, #root {
 
 .app-container.desktop-layout-root {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   height: 100dvh;
   display: flex;
   overflow: hidden;
@@ -99,7 +99,7 @@ html, body, #root {
 /* Auth Ekranı */
 .auth-modal-overlay {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   height: 100dvh;
   display: flex;
   align-items: center;
@@ -421,8 +421,8 @@ html, body, #root {
 /* Sağ İçerik Paneli */
 .content-panel {
   flex: 1;
-  height: 100vh;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
   background-color: var(--kevok-sidebar);
   display: flex;
   flex-direction: column;
@@ -440,22 +440,35 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Sohbet Odası - Ekranın tamamını esnek ve boşluksuz kaplar */
+/* --- KESİN ÇÖZÜM: Sohbet Odası & Sabit Üst Bar Düzeni --- */
 .chat-room-container {
-  width: 100%;
-  height: 100%;
-  background-color: var(--kevok-sidebar);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  background-color: var(--kevok-sidebar);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.sub-screen-header, .chat-room-header {
+/* Üst Profil Barı - ASLA yukarı kaymaz, sabit kalır */
+.chat-room-header {
+  flex: 0 0 auto !important;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--kevok-border);
+  background-color: var(--kevok-sidebar);
+  z-index: 10;
+}
+
+.sub-screen-header {
   padding: 16px 20px;
   display: flex;
   align-items: center;
@@ -658,19 +671,18 @@ html, body, #root {
   font-weight: 500;
 }
 
-/* Mesajlar Alanı - Kalan boşluğu esnek doldurur */
+/* --- KESİN ÇÖZÜM: Mesajlar Akışı (Sadece kendi içinde kaynar) --- */
 .messages-stream {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   background: #030712;
-  min-height: 0;
   -webkit-overflow-scrolling: touch;
 }
-
 
 .message-bubble {
   max-width: 75%;
@@ -760,15 +772,15 @@ html, body, #root {
   40% { transform: scale(1.0); }
 }
 
-/* Mesaj Giriş Formu - Klavyenin ve öneri çubuğunun hemen üstüne yapışır */
+/* --- KESİN ÇÖZÜM: Mesaj Giriş Formu (Klavyenin hemen üstüne yapışır) --- */
 .message-input-form {
-  padding: 12px 16px;
+  flex: 0 0 auto !important;
+  padding: 10px 16px;
   background: var(--kevok-sidebar);
   border-top: 1px solid var(--kevok-border);
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0 !important;
   width: 100%;
   z-index: 20;
 }
@@ -975,7 +987,7 @@ html, body, #root {
   max-width: 350px;
 }
 
-/* --- KESİN MOBİL UYUMLULUK KURALLARI (Responsive) --- */
+/* --- MOBİL UYUMLULUK KURALLARI (Responsive) --- */
 @media (max-width: 768px) {
   .mobile-hidden-sidebar {
     display: none !important;
@@ -990,18 +1002,10 @@ html, body, #root {
     height: 100% !important;
   }
 
- /* İçerik Paneli - Tam ekran ve normal mod uyumlu */
-.content-panel {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  background-color: var(--kevok-sidebar);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  min-width: 0;
-}
+  .content-panel {
+    width: 100% !important;
+    height: 100% !important;
+  }
 
   .fab-container {
     left: auto !important;
